@@ -15,22 +15,32 @@ WebAudio.
 
 - **Click a difference in either picture.** Found differences get a green ring
   and a check mark on both panels.
+- **Magnifier (L):** a lens follows your pointer and zooms the scene 2x, so
+  small details are easy to compare. On touch it floats above your fingertip.
+  Press L (or the Lens button) to turn it off and on.
+- **Keyboard cursor:** arrow keys move a crosshair (Shift = fine step),
+  Enter or Space marks the spot under it — the whole game is playable
+  without a mouse.
 - **Wrong clicks** cost 25 points and 2 seconds, and reset your combo.
 - **Combos pay:** consecutive finds without a miss are worth 100, 200, 300…
   points each.
 - **Hints (H):** 3 per level, each rings an unfound difference for a few
   seconds and costs 50 points.
-- **Keys:** H hint · P pause · R restart level · M mute · Esc menu ·
-  1 / 2 / 3 jump to a level · Enter start / next.
+- **Keys:** H hint · P pause · R restart level · M mute · L magnifier ·
+  Esc menu · 1 / 2 / 3 / 4 / 5 / 6 jump to a level · Enter start / next ·
+  arrows + Enter/Space play by keyboard.
 
 ## Levels
 
 1. **Sunny Park** (easy) — 7 differences, 3:00
 2. **Cozy Café** (medium) — 7 differences, 2:30
 3. **Moonlit Harbour** (hard) — 8 differences, 2:00
+4. **Rainy Rooftop** (medium) — 9 differences, 3:00
+5. **Starry Campsite** (hard) — 9 differences, 2:45
+6. **Busy Bakery** (expert) — 10 differences, 2:30
 
 Clear a level to earn a time bonus and 1–3 stars (3 stars for a perfect run
-with no misses). Find all 22 differences to win.
+with no misses). Find all 50 differences to win.
 
 ## Run it
 
@@ -56,10 +66,12 @@ writes `dossier.json` with the vendored `vendor/makefun-game.ts` library.
 
 - `game/index.html` — page shell and canvas
 - `game/src/config.js` — sizes, timings, scoring
-- `game/src/scenes.js` — the three original scenes and their differences
-- `game/src/game.js` — rules: state, scoring, timer, hints
-- `game/src/input.js` — pointer and keyboard input
-- `game/src/render.js` — all canvas drawing: panels, HUD, screens
+- `game/src/scenes.js` — the first three original scenes and their differences
+- `game/src/scenes2.js` — three more original scenes (Rainy Rooftop,
+  Starry Campsite, Busy Bakery) and their differences
+- `game/src/game.js` — rules: state, scoring, timer, hints, lens, cursor
+- `game/src/input.js` — pointer and keyboard input (incl. magnifier + cursor)
+- `game/src/render.js` — all canvas drawing: panels, HUD, lens, screens
 - `game/src/audio.js` — synthesised sound effects
 - `game/src/random.js` — seeded random for deterministic decoration
 - `game/src/shots.js` — deterministic screenshot staging

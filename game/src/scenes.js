@@ -4,6 +4,7 @@
 // circle (x, y, r) of every difference, in panel coordinates (560 x 520).
 // A difference is fair when its circle sits exactly on the changed drawing.
 import { scatter } from './random.js';
+import { NEW_SCENES } from './scenes2.js';
 
 // --- small drawing helpers (panel-local coordinates) ---
 function circle(g, x, y, r, fill) {
@@ -478,4 +479,5 @@ export const SCENES = [
   { draw: drawPark, diffs: PARK_DIFFS },
   { draw: drawCafe, diffs: CAFE_DIFFS },
   { draw: drawHarbour, diffs: HARBOUR_DIFFS },
+  ...NEW_SCENES,
 ];

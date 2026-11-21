@@ -16,7 +16,20 @@ export const LEVELS = [
   { id: 0, name: 'Sunny Park', tag: 'Easy · 7 differences', seconds: 180, diffs: 7 },
   { id: 1, name: 'Cozy Café', tag: 'Medium · 7 differences', seconds: 150, diffs: 7 },
   { id: 2, name: 'Moonlit Harbour', tag: 'Hard · 8 differences', seconds: 120, diffs: 8 },
+  { id: 3, name: 'Rainy Rooftop', tag: 'Medium · 9 differences', seconds: 180, diffs: 9 },
+  { id: 4, name: 'Starry Campsite', tag: 'Hard · 9 differences', seconds: 165, diffs: 9 },
+  { id: 5, name: 'Busy Bakery', tag: 'Expert · 10 differences', seconds: 150, diffs: 10 },
 ];
+
+// Magnifier (lens): radius on screen, zoom factor, toggle key.
+export const LENS_RADIUS = 72;
+export const LENS_ZOOM = 2;
+
+// Keyboard cursor: step in panel pixels per arrow press (Shift = fine step).
+export const CURSOR_STEP = 14;
+export const CURSOR_FINE_STEP = 4;
+// Touch: how far above the fingertip the lens sits, so the finger never covers it.
+export const LENS_TOUCH_LIFT = 90;
 
 export const HINTS_PER_LEVEL = 3;
 export const HINT_COOLDOWN_MS = 10000;

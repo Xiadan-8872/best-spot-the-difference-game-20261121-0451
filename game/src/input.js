@@ -1,6 +1,15 @@
 // Pointer and keyboard input: where a click lands, which key was pressed.
 // One job: translate browser events into game calls, nothing else.
-import { PANEL_LEFT_X, PANEL_RIGHT_X, PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT } from './config.js';
+import {
+  PANEL_LEFT_X,
+  PANEL_RIGHT_X,
+  PANEL_Y,
+  PANEL_WIDTH,
+  PANEL_HEIGHT,
+  CURSOR_STEP,
+  CURSOR_FINE_STEP,
+  LENS_TOUCH_LIFT,
+} from './config.js';
 import {
   SCREEN_TITLE,
   SCREEN_PLAY,
@@ -14,6 +23,9 @@ import {
   nextLevel,
   togglePause,
   toTitle,
+  moveCursor,
+  markCursor,
+  toggleLens,
 } from './game.js';
 import { toggleMute, playClick } from './audio.js';
 
@@ -42,6 +54,8 @@ export function attachInput(canvas, game, buttons) {
   };
   canvas.addEventListener('pointerdown', (event) => {
     const { rect, scale } = rectOf();
+    // A mouse click takes over from the keyboard cursor.
+    game.cursorVisible = false;
     const hit = panelHit(event.clientX, event.clientY, rect, scale);
     if (hit) {
       clickAt(game, hit.x, hit.y, performance.now());
@@ -59,6 +73,24 @@ export function attachInput(canvas, game, buttons) {
     }
   });
 
+  // The magnifier follows the pointer; on touch it sits above the fingertip
+  // but still shows the scene under the finger.
+  canvas.addEventListener('pointermove', (event) => {
+    const { rect, scale } = rectOf();
+    const hit = panelHit(event.clientX, event.clientY, rect, scale);
+    if (!hit) {
+      game.lensPos = null;
+      return;
+    }
+    const lift = event.pointerType === 'touch' ? LENS_TOUCH_LIFT : 0;
+    const cx = (event.clientX - rect.left) / scale;
+    const cy = (event.clientY - rect.top) / scale - lift;
+    game.lensPos = { cx, cy, panel: hit.panel, x: hit.x, y: hit.y };
+  });
+  canvas.addEventListener('pointerleave', () => {
+    game.lensPos = null;
+  });
+
   window.addEventListener('keydown', (event) => {
     const now = performance.now();
     const key = event.key.toLowerCase();
@@ -71,6 +103,9 @@ export function attachInput(canvas, game, buttons) {
       if (key === '1') startLevel(game, 0);
       if (key === '2') startLevel(game, 1);
       if (key === '3') startLevel(game, 2);
+      if (key === '4') startLevel(game, 3);
+      if (key === '5') startLevel(game, 4);
+      if (key === '6') startLevel(game, 5);
       return;
     }
     if (game.screen === SCREEN_LEVEL_DONE) {
@@ -86,7 +121,21 @@ export function attachInput(canvas, game, buttons) {
       if (key === 'h') useHint(game, now);
       if (key === 'p') togglePause(game);
       if (key === 'r') startLevel(game, game.levelIndex);
+      if (key === 'l') toggleLens(game);
       if (key === 'escape') toTitle(game);
+      // Keyboard cursor: arrows move, Enter/Space marks the spot.
+      if (key.startsWith('arrow')) {
+        event.preventDefault();
+        const step = event.shiftKey ? CURSOR_FINE_STEP : CURSOR_STEP;
+        if (key === 'arrowup') moveCursor(game, 0, -step);
+        if (key === 'arrowdown') moveCursor(game, 0, step);
+        if (key === 'arrowleft') moveCursor(game, -step, 0);
+        if (key === 'arrowright') moveCursor(game, step, 0);
+      }
+      if (key === 'enter' || key === ' ') {
+        event.preventDefault();
+        markCursor(game, now);
+      }
     }
   });
 }

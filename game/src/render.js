@@ -11,6 +11,8 @@ import {
   PANEL_WIDTH,
   PANEL_HEIGHT,
   LEVELS,
+  LENS_RADIUS,
+  LENS_ZOOM,
   COLORS,
 } from './config.js';
 import { SCENES } from './scenes.js';
@@ -24,7 +26,7 @@ import {
   remainingCount,
   levelDiffs,
 } from './game.js';
-import { useHint, startLevel, startGame, nextLevel, togglePause, toTitle } from './game.js';
+import { useHint, startLevel, startGame, nextLevel, togglePause, toTitle, toggleLens } from './game.js';
 import { toggleMute, isMuted } from './audio.js';
 
 /** Footer buttons the input layer clicks; each decides when it shows. */
@@ -50,11 +52,96 @@ export const FOOTER_BUTTONS = [
     onPress: (g) => toTitle(g),
   },
   {
+    x: 704, y: 668, w: 150, h: 44, label: 'Lens  (L)',
+    visible: (g) => g.screen === SCREEN_PLAY,
+    onPress: (g) => toggleLens(g),
+  },
+  {
     x: 1090, y: 668, w: 150, h: 44, label: 'Sound  (M)',
     visible: (g) => g.screen === SCREEN_PLAY || g.screen === SCREEN_TITLE,
     onPress: () => toggleMute(),
   },
 ];
+
+// --- magnifier: the current level's scenes, rendered once each at LENS_ZOOM ---
+let cachedLevel = -1;
+let cachedCanvases = null;
+function sceneCanvases(levelIndex) {
+  if (cachedLevel === levelIndex && cachedCanvases) return cachedCanvases;
+  const build = (right) => {
+    const c = document.createElement('canvas');
+    c.width = PANEL_WIDTH * LENS_ZOOM;
+    c.height = PANEL_HEIGHT * LENS_ZOOM;
+    const ctx = c.getContext('2d');
+    ctx.scale(LENS_ZOOM, LENS_ZOOM);
+    SCENES[levelIndex].draw(ctx, right);
+    return c;
+  };
+  cachedCanvases = { left: build(false), right: build(true) };
+  cachedLevel = levelIndex;
+  return cachedCanvases;
+}
+
+/** The magnifier lens: a 2x zoom of the scene under the pointer. */
+function drawLens(g, game) {
+  if (!game.lens || !game.lensPos || game.screen !== SCREEN_PLAY) return;
+  const { cx, cy, panel, x, y } = game.lensPos;
+  const canvases = sceneCanvases(game.levelIndex);
+  const src = panel === 'left' ? canvases.left : canvases.right;
+  const r = LENS_RADIUS;
+  const z = LENS_ZOOM;
+  // Source: an r x r panel-px region centred on the pointer, in offscreen px.
+  const sw = r * 2;
+  const sx = Math.max(0, Math.min(PANEL_WIDTH * z - sw, x * z - r));
+  const sy = Math.max(0, Math.min(PANEL_HEIGHT * z - sw, y * z - r));
+  g.save();
+  g.beginPath();
+  g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.clip();
+  g.drawImage(src, sx, sy, sw, sw, cx - r, cy - r, r * 2, r * 2);
+  g.restore();
+  // Ring + crosshair.
+  g.strokeStyle = COLORS.accentDark;
+  g.lineWidth = 4;
+  g.beginPath();
+  g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.stroke();
+  g.strokeStyle = 'rgba(32,36,46,0.7)';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(cx - 10, cy);
+  g.lineTo(cx + 10, cy);
+  g.moveTo(cx, cy - 10);
+  g.lineTo(cx, cy + 10);
+  g.stroke();
+}
+
+/** The keyboard cursor: a crosshair where the arrow keys have put it. */
+function drawCursor(g, game) {
+  if (!game.cursorVisible || game.screen !== SCREEN_PLAY) return;
+  const panelX = game.cursor.panel === 'left' ? PANEL_LEFT_X : PANEL_RIGHT_X;
+  const cx = panelX + game.cursor.x;
+  const cy = PANEL_Y + game.cursor.y;
+  g.strokeStyle = COLORS.accentDark;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(cx, cy, 16, 0, Math.PI * 2);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(cx - 22, cy);
+  g.lineTo(cx - 8, cy);
+  g.moveTo(cx + 8, cy);
+  g.lineTo(cx + 22, cy);
+  g.moveTo(cx, cy - 22);
+  g.lineTo(cx, cy - 8);
+  g.moveTo(cx, cy + 8);
+  g.lineTo(cx, cy + 22);
+  g.stroke();
+  g.fillStyle = COLORS.accentDark;
+  g.beginPath();
+  g.arc(cx, cy, 3, 0, Math.PI * 2);
+  g.fill();
+}
 
 function roundRect(g, x, y, w, h, r) {
   g.beginPath();
@@ -172,9 +259,9 @@ function drawHeader(g, game) {
     g.fillText(`FOUND ${foundCount(game)} / ${level.diffs}  ·  ${remainingCount(game)} TO GO`, 640, 38);
     g.font = '16px system-ui, sans-serif';
     g.fillStyle = '#ffd166';
-    g.fillText(`${level.name}  —  Level ${game.levelIndex + 1} of 3`, 640, 64);
+    g.fillText(`${level.name}  —  Level ${game.levelIndex + 1} of ${LEVELS.length}`, 640, 64);
   } else {
-    g.fillText('THREE SCENES · 22 DIFFERENCES', 640, 38);
+    g.fillText('SIX SCENES · 50 DIFFERENCES', 640, 38);
     g.font = '16px system-ui, sans-serif';
     g.fillStyle = '#ffd166';
     g.fillText('click a difference in either picture', 640, 64);
@@ -213,17 +300,22 @@ function drawFooter(g, game, now) {
     g.fillStyle = '#20242e';
     g.font = 'bold 16px system-ui, sans-serif';
     g.textAlign = 'center';
-    const label = b.label.startsWith('Hint') ? `Hint (${game.hintsLeft})  H` : b.label.startsWith('Sound') ? (isMuted() ? 'Muted  (M)' : 'Sound  (M)') : b.label;
+    const label = b.label.startsWith('Hint') ? `Hint (${game.hintsLeft})  H`
+      : b.label.startsWith('Sound') ? (isMuted() ? 'Muted  (M)' : 'Sound  (M)')
+      : b.label.startsWith('Lens') ? (game.lens ? 'Lens ✓  (L)' : 'Lens ✗  (L)')
+      : b.label;
     g.fillText(label, b.x + b.w / 2, b.y + 28);
   }
   g.fillStyle = COLORS.ink;
   g.font = '17px system-ui, sans-serif';
   g.textAlign = 'left';
   g.fillText(game.message, 40, 752);
-  // Progress dots for the level's differences.
+  // Progress dots for the level's differences, right-aligned.
   const diffs = levelDiffs(game);
+  const dotGap = 20;
+  const startX = 1240 - (diffs.length - 1) * dotGap;
   diffs.forEach((d, i) => {
-    const x = 1090 + i * 22;
+    const x = startX + i * dotGap;
     g.fillStyle = game.found.includes(i) ? COLORS.good : '#d9d9d9';
     g.beginPath();
     g.arc(x, 744, 8, 0, Math.PI * 2);
@@ -265,35 +357,36 @@ function drawTitle(g, game) {
   g.font = '22px system-ui, sans-serif';
   g.fillStyle = '#5a5a5a';
   g.fillText('Two pictures. One is lying. Find every difference.', 640, 236);
-  // Three scene thumbnails with their names.
+  // Six scene thumbnails with their names, one row.
   LEVELS.forEach((level, i) => {
-    const x = 250 + i * 270;
+    const x = 199 + i * 149;
     const y = 268;
     g.save();
     g.beginPath();
-    g.rect(x, y, 220, 150);
+    g.rect(x, y, 140, 130);
     g.clip();
     g.translate(x, y);
-    g.scale(220 / 560, 150 / 520);
+    g.scale(140 / 560, 130 / 520);
     SCENES[i].draw(g, false);
     g.restore();
     g.strokeStyle = COLORS.ink;
     g.lineWidth = 3;
-    g.strokeRect(x, y, 220, 150);
+    g.strokeRect(x, y, 140, 130);
     g.fillStyle = COLORS.ink;
-    g.font = 'bold 17px system-ui, sans-serif';
-    g.fillText(level.name, x + 110, y + 176);
-    g.font = '14px system-ui, sans-serif';
+    g.font = 'bold 15px system-ui, sans-serif';
+    g.fillText(level.name, x + 70, y + 152);
+    g.font = '12px system-ui, sans-serif';
     g.fillStyle = '#5a5a5a';
-    g.fillText(level.tag, x + 110, y + 198);
+    g.fillText(level.tag, x + 70, y + 172);
   });
   g.fillStyle = COLORS.ink;
   g.font = '17px system-ui, sans-serif';
-  g.fillText('Click a difference in either picture · wrong clicks cost 25 pts and 2 seconds', 640, 510);
-  g.fillText('H hint (3 per level) · P pause · R restart · M sound · 1 / 2 / 3 jump to a level', 640, 538);
+  g.fillText('Click a difference in either picture · wrong clicks cost 25 pts and 2 seconds', 640, 492);
+  g.fillText('H hint (3 per level) · P pause · R restart · M sound · L magnifier · 1–6 jump to a level', 640, 518);
+  g.fillText('← ↑ ↓ → move the keyboard cursor · Enter / Space mark a difference', 640, 544);
   g.fillStyle = COLORS.accentDark;
   g.font = 'bold 24px system-ui, sans-serif';
-  g.fillText('▶  Press ENTER to start hunting', 640, 596);
+  g.fillText('▶  Press ENTER to start hunting', 640, 592);
 }
 
 function drawLevelDone(g, game) {
@@ -344,7 +437,7 @@ function drawVictory(g, game) {
   g.fillText('★★★', 640, 322);
   g.fillStyle = COLORS.ink;
   g.font = '19px system-ui, sans-serif';
-  g.fillText('All 22 differences across three scenes — every twin matched.', 640, 368);
+  g.fillText('All 50 differences across six scenes — every twin matched.', 640, 368);
   g.fillText(`Final score ${game.score}  ·  Best combo ×${game.bestCombo}  ·  Misses ${game.misses}`, 640, 402);
   g.fillText('Thanks for playing Odd Twin!', 640, 434);
   g.fillStyle = COLORS.accentDark;
@@ -380,6 +473,8 @@ export function drawGame(g, game, now) {
     drawPanel(g, game, PANEL_LEFT_X, false, now);
     drawPanel(g, game, PANEL_RIGHT_X, true, now);
     drawFloaters(g, game, now);
+    drawLens(g, game);
+    drawCursor(g, game);
     if (game.screen === SCREEN_LEVEL_DONE) drawLevelDone(g, game);
     if (game.screen === SCREEN_GAME_OVER) drawGameOver(g, game);
     if (game.screen === SCREEN_VICTORY) drawVictory(g, game);

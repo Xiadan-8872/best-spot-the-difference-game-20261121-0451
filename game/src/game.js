@@ -3,6 +3,8 @@
 // when a level ends — with no drawing and no input in here.
 import {
   LEVELS,
+  PANEL_WIDTH,
+  PANEL_HEIGHT,
   HINTS_PER_LEVEL,
   HINT_COOLDOWN_MS,
   HINT_REVEAL_MS,
@@ -21,7 +23,7 @@ export const SCREEN_LEVEL_DONE = 'levelDone';
 export const SCREEN_GAME_OVER = 'gameOver';
 export const SCREEN_VICTORY = 'victory';
 
-/** Fresh state for one whole run (all three levels). */
+/** Fresh state for one whole run (all six levels). */
 export function createGame() {
   return {
     screen: SCREEN_TITLE,
@@ -46,6 +48,10 @@ export function createGame() {
     lastTickSecond: -1,
     message: 'Find every difference — click it in either picture.',
     frozen: false, // screenshot staging: the timer never runs
+    lens: true, // magnifier enabled (L toggles it)
+    lensPos: null, // { cx, cy, panel, x, y } — pointer in canvas coords + panel-local
+    cursor: { panel: 'left', x: 280, y: 260 }, // keyboard cursor, panel-local
+    cursorVisible: false, // appears on the first arrow-key press
   };
 }
 
@@ -78,6 +84,9 @@ export function startLevel(game, index) {
   game.levelStartScore = game.score;
   game.levelTimeBonus = 0;
   game.stars = 0;
+  game.cursor = { panel: 'left', x: 280, y: 260 };
+  game.cursorVisible = false;
+  game.lensPos = null;
   game.message = `Level ${index + 1}: ${LEVELS[index].name} — ${LEVELS[index].diffs} differences to find.`;
 }
 
@@ -200,4 +209,39 @@ export function togglePause(game) {
 export function toTitle(game) {
   game.screen = SCREEN_TITLE;
   game.paused = false;
+}
+
+/** Move the keyboard cursor by (dx, dy) panel pixels; it crosses panels at the edges. */
+export function moveCursor(game, dx, dy) {
+  if (game.screen !== SCREEN_PLAY || game.paused) return;
+  game.cursorVisible = true;
+  let { panel, x, y } = game.cursor;
+  x += dx;
+  y += dy;
+  if (x > PANEL_WIDTH && panel === 'left') {
+    panel = 'right';
+    x -= PANEL_WIDTH;
+  }
+  if (x < 0 && panel === 'right') {
+    panel = 'left';
+    x += PANEL_WIDTH;
+  }
+  x = Math.max(0, Math.min(PANEL_WIDTH, x));
+  y = Math.max(0, Math.min(PANEL_HEIGHT, y));
+  game.cursor = { panel, x, y };
+}
+
+/** Mark the spot under the keyboard cursor (same as a click there). */
+export function markCursor(game, now) {
+  if (game.screen !== SCREEN_PLAY || game.paused) return 'none';
+  game.cursorVisible = true;
+  return clickAt(game, game.cursor.x, game.cursor.y, now);
+}
+
+/** Toggle the magnifier lens on/off. */
+export function toggleLens(game) {
+  game.lens = !game.lens;
+  game.message = game.lens
+    ? 'Magnifier on — hover a picture to zoom in.'
+    : 'Magnifier off — press L to bring it back.';
 }
